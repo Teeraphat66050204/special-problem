@@ -1,0 +1,35 @@
+# Private benchmark data
+datasets/ocr-benchmark/pdfs/*
+!datasets/ocr-benchmark/pdfs/.gitkeep
+datasets/ocr-benchmark/images/*
+!datasets/ocr-benchmark/images/.gitkeep
+datasets/ocr-benchmark/ground-truth/*
+!datasets/ocr-benchmark/ground-truth/.gitkeep
+datasets/ocr-benchmark/manifests/manifest.csv
+!datasets/ocr-benchmark/manifests/manifest.example.csv
+
+# Generated OCR outputs
+experiments/ocr-benchmark/outputs/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node.js
+node_modules/
+dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Keep intentionally empty directories
+!**/.gitkeep

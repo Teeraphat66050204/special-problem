@@ -1,0 +1,3 @@
+document_id,pdf_file,page_number,ground_truth_file,document_type
+sample-doc-001,sample-document-001.pdf,3,sample-document-001-page-003.txt,special-project
+sample-doc-002,sample-document-002.pdf,5,sample-document-002-page-005.txt,special-project
