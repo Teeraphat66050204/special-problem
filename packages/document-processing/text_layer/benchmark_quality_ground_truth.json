@@ -1,0 +1,297 @@
+{
+  "schema_version": 1,
+  "dataset": "OCR benchmark PDF abstract pages",
+  "verification": {
+    "method": "Manual comparison of the visible PDF page with raw text extracted independently by PyMuPDF. Classifier predictions were not used to assign labels.",
+    "reviewed_pages": 40,
+    "reviewed_languages": ["thai", "english"],
+    "thai_reference_text": "The existing OCR benchmark ground truth was used only as supplementary character-level evidence after manual review."
+  },
+  "labels": {
+    "good": "The important fields and main text are sufficiently correct for text normalization and metadata extraction.",
+    "poor": "A text layer exists, but corruption, wrong character mapping, or missing important content makes direct metadata extraction unsafe.",
+    "missing": "No usable text layer exists, or too little text is present to continue."
+  },
+  "pages": [
+    {
+      "document_id": "document_007",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Visible Thai is correct, but raw text has recurring substitutions inside labels, names, advisor data, and body text, such as ข%อ, ให5, and วิทยาศาสตรR."
+    },
+    {
+      "document_id": "document_007",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw title, student ID, degree, advisor, abstract body, and keywords match the visible page at usable quality."
+    },
+    {
+      "document_id": "document_009",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Raw Thai contains recurring wrong glyph mappings throughout metadata and body text, including ข%อ, ฟ*งก,ชัน, and ส/ง."
+    },
+    {
+      "document_id": "document_009",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw metadata and the complete English abstract remain readable and consistent with the visible page."
+    },
+    {
+      "document_id": "document_022",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "The raw layer systematically maps visible Thai sara aa to sara am across metadata and body text, for example งาน to งำน and การ to กำร."
+    },
+    {
+      "document_id": "document_022",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw metadata and abstract paragraphs are complete and readable compared with the visible page."
+    },
+    {
+      "document_id": "document_064",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Most visible Thai is emitted as Latin Extended legacy-font glyphs, making names, labels, advisor data, and the abstract unreadable as Thai."
+    },
+    {
+      "document_id": "document_064",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "The raw layer uses U+01F0 for many spaces and loses some scientific punctuation, but all core metadata fields and the main English abstract remain readable for metadata extraction."
+    },
+    {
+      "document_id": "document_071",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "Raw Thai metadata and body text closely match the visible page with only negligible extraction differences."
+    },
+    {
+      "document_id": "document_071",
+      "language": "english",
+      "page_number": 6,
+      "label": "good",
+      "rationale": "Raw English metadata and abstract content are complete and readable."
+    },
+    {
+      "document_id": "document_114",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Visible Thai is correct, while raw labels, names, title, and body contain recurring symbol substitutions such as ข%อ, ป(ญหา, and อาจารย=."
+    },
+    {
+      "document_id": "document_114",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw title, student information, advisor, and abstract text are usable and agree with the visible page."
+    },
+    {
+      "document_id": "document_123",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Thai metadata and abstract text are almost entirely emitted as unrelated Latin Extended legacy-font glyphs."
+    },
+    {
+      "document_id": "document_123",
+      "language": "english",
+      "page_number": 6,
+      "label": "good",
+      "rationale": "The extracted English fields and abstract body are readable and consistent with the visible page."
+    },
+    {
+      "document_id": "document_127",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Raw Thai has recurring substitutions in title, student names, institution, advisor, and abstract body, including ข%อ, สัดส:วน, and วิทยาศาสตรe."
+    },
+    {
+      "document_id": "document_127",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw metadata, formulas, paragraphs, and keywords are readable and suitable for downstream processing."
+    },
+    {
+      "document_id": "document_137",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "Raw Thai text closely matches the visible page and preserves the important metadata and abstract."
+    },
+    {
+      "document_id": "document_137",
+      "language": "english",
+      "page_number": 6,
+      "label": "good",
+      "rationale": "Raw English metadata and abstract are complete and readable."
+    },
+    {
+      "document_id": "document_191",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Raw Thai repeatedly replaces normal Thai letters with Latin Extended glyphs across the title, names, labels, advisor fields, and body."
+    },
+    {
+      "document_id": "document_191",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English fields, numeric results, abstract, and keywords remain usable."
+    },
+    {
+      "document_id": "document_213",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Many visible Thai vowels and tone marks are emitted as private-use presentation glyphs throughout metadata and body text, making direct normalization unsafe."
+    },
+    {
+      "document_id": "document_213",
+      "language": "english",
+      "page_number": 6,
+      "label": "good",
+      "rationale": "Raw English metadata, scientific names, measurements, and abstract content are readable."
+    },
+    {
+      "document_id": "document_222",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "Raw Thai metadata and body match the visible page with negligible character differences."
+    },
+    {
+      "document_id": "document_222",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw metadata and the complete English abstract remain readable despite the page watermark."
+    },
+    {
+      "document_id": "document_251",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Thai text is heavily mixed with Latin Extended legacy-font glyphs throughout metadata and the abstract."
+    },
+    {
+      "document_id": "document_251",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English metadata, organism names, results, and body text are readable and usable."
+    },
+    {
+      "document_id": "document_253",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Recurring character substitutions affect labels and content across the page, such as ข&อ, บIงชี้, and วิทยาศาสตร."
+    },
+    {
+      "document_id": "document_253",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English metadata, scientific notation, body paragraphs, and keywords remain usable."
+    },
+    {
+      "document_id": "document_254",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Visible Thai is almost entirely mapped to unrelated Latin Extended glyph sequences in raw extraction."
+    },
+    {
+      "document_id": "document_254",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English student information, degree, advisors, and abstract paragraph are readable."
+    },
+    {
+      "document_id": "document_266",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "The text layer preserves the important metadata and abstract; one isolated year-label glyph does not prevent downstream use."
+    },
+    {
+      "document_id": "document_266",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English title, student ID, advisor, body, and keywords are complete and readable."
+    },
+    {
+      "document_id": "document_283",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "Raw Thai metadata and long abstract body closely match the visible page."
+    },
+    {
+      "document_id": "document_283",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw metadata, model names, metrics, abstract, and keywords are readable."
+    },
+    {
+      "document_id": "document_295",
+      "language": "thai",
+      "page_number": 4,
+      "label": "good",
+      "rationale": "Minor isolated spelling/extraction differences exist, but the title, student, advisor, main abstract, and keywords remain usable."
+    },
+    {
+      "document_id": "document_295",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English metadata, technical terms, body text, and keywords are readable."
+    },
+    {
+      "document_id": "document_335",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Raw metadata and body contain widespread symbol substitutions such as ข%อ, เรียนรู+, ผ-าน, and วิทยาศาสตร6."
+    },
+    {
+      "document_id": "document_335",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English title, student data, abstract paragraphs, frameworks, and key terms remain readable."
+    },
+    {
+      "document_id": "document_339",
+      "language": "thai",
+      "page_number": 4,
+      "label": "poor",
+      "rationale": "Recurring wrong glyph mappings affect the title, institution, advisor, and body, including ข%อ, ค&นหา, วิทยาศาสตรU, and ป]การศึกษา."
+    },
+    {
+      "document_id": "document_339",
+      "language": "english",
+      "page_number": 5,
+      "label": "good",
+      "rationale": "Raw English metadata, architecture description, product names, and keywords are complete and usable."
+    }
+  ]
+}

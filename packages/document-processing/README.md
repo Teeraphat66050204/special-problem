@@ -1,8 +1,17 @@
-# Abstract Page Detection
+# Document Processing
 
-This package detects likely Thai and English abstract pages from a PDF text
-layer. It is standalone and does not depend on the API application or any OCR
-runner.
+This standalone package currently implements this pipeline:
+
+```text
+PDF
+  -> Abstract Page Detection
+  -> Text Layer Extraction
+  -> Text Layer Quality Assessment
+  -> OCR Fallback (not implemented yet)
+```
+
+It does not depend on the API application, OCR runners, a database, or a
+metadata extraction pipeline.
 
 ## Installation
 
@@ -126,7 +135,76 @@ When no page passes the threshold, `page_number` and `page_index` are `null`,
 `requires_manual_selection` is `true`, and ranked candidates remain available
 for manual review.
 
+## Text Layer Extraction and Quality
+
+The text-layer stage calls Abstract Page Detection and processes every item in
+`abstract_pages`; `primary_candidate` is retained only as detection context.
+It extracts each page with PyMuPDF using `page.get_text("text", sort=True)`.
+
+```python
+import sys
+
+sys.path.insert(0, "packages/document-processing")
+
+from text_layer import analyze_abstract_text_layers
+
+result = analyze_abstract_text_layers("document.pdf")
+```
+
+`extract_page_text(pdf_path, page_index)` can be used independently for one
+zero-based page. `extract_abstract_text_layers(pdf_path, abstract_pages)`
+accepts the complete Abstract Detection page list and preserves its order and
+language labels.
+
+Two text values are deliberately separate:
+
+- `raw_text` is the exact string returned by PyMuPDF and is never rewritten.
+- `normalized_for_quality_text` is an NFC-normalized assessment copy with
+  normalized line endings, trimmed lines, and collapsed repeated whitespace.
+
+Availability and usability are also separate. `available: true` only means
+that non-whitespace text was extracted. A present but damaged layer can still
+be `quality: "poor"` with `requires_ocr: true`.
+
+The deterministic quality score combines four components configured in the
+immutable `QualityConfig` dataclass:
+
+- text amount: 0.25;
+- readable character quality: 0.30;
+- language plausibility for the candidate language: 0.25; and
+- expected abstract structure: 0.20.
+
+The structural component uses heading (0.30), advisor (0.15), keywords
+(0.20), student ID (0.10), and paragraph-like text (0.25). The default
+`good` threshold is 0.70. Empty text is always `missing`; other scores below
+the threshold are `poor`. The assessment also applies configurable penalties
+for replacement/control characters, unusual symbols, suspicious Latin
+Extended characters, and non-Thai characters embedded inside Thai word
+sequences. All weights, thresholds, and corruption penalties are centralized
+in `QualityConfig`.
+
+An abridged analyzed page looks like this:
+
+```json
+{
+  "page_number": 4,
+  "page_index": 3,
+  "language": "thai",
+  "text_layer": {
+    "available": true,
+    "raw_text": "...",
+    "normalized_for_quality_text": "...",
+    "quality_score": 0.62,
+    "quality": "poor",
+    "requires_ocr": true,
+    "reasons": ["broken_thai_intraword_sequences"]
+  }
+}
+```
+
 ## CLI
+
+Abstract Page Detection:
 
 ```powershell
 python packages/document-processing/abstract_detection/detect_abstract_page.py `
@@ -137,6 +215,19 @@ python packages/document-processing/abstract_detection/detect_abstract_page.py `
 
 The CLI writes the complete structured result as UTF-8 JSON, including page
 numbers, scores, confidence values, matched features, and candidate status.
+
+Text Layer Extraction and Quality Assessment:
+
+```powershell
+python packages/document-processing/text_layer/analyze_text_layer.py `
+  --input datasets/ocr-benchmark/pdfs/document_007.pdf `
+  --max-pages 15 `
+  --top-k 5
+```
+
+Add `--json` to emit the complete structured result, including raw text,
+quality features, reasons, and the page numbers currently marked
+`requires_ocr`.
 
 ## Benchmark Evaluation
 
@@ -166,11 +257,48 @@ The report includes:
   ranked `candidates`, measured over all expected abstract pages; and
 - document-level expected/predicted pages for every miss.
 
+## Text Layer Quality Evaluation
+
+`text_layer/benchmark_quality_ground_truth.json` contains manually assigned
+`good`, `poor`, or `missing` usability labels for all 40 benchmark abstract
+pages. Each label was assigned by comparing the visible PDF page with raw
+PyMuPDF text; classifier output was not used to determine the label. Review
+rationales are stored with every record and are not imported by production
+quality logic.
+
+Run the classification evaluation from the repository root:
+
+```powershell
+python packages/document-processing/text_layer/evaluate_text_layer_quality.py `
+  --pdf-dir datasets/ocr-benchmark/pdfs
+```
+
+Add the existing Thai OCR references as supplementary CER evidence:
+
+```powershell
+python packages/document-processing/text_layer/evaluate_text_layer_quality.py `
+  --pdf-dir datasets/ocr-benchmark/pdfs `
+  --manifest datasets/ocr-benchmark/manifests/manifest.csv `
+  --thai-reference-dir datasets/ocr-benchmark/ground-truth
+```
+
+The evaluator reports overall, Thai, and English multiclass accuracy. It also
+treats `poor` and `missing` as a positive `requires_ocr` decision and reports
+precision, recall, F1, false positives, false negatives, and every mismatch.
+False negatives are operationally more serious because they allow damaged text
+to continue to metadata extraction. CER reuses the existing OCR evaluator's
+normalization and character-distance functions and remains supplementary; it
+does not assign usability labels.
+
 ## Tests
 
 ```powershell
 python -m unittest discover `
   -s packages/document-processing/abstract_detection `
+  -p "test_*.py"
+
+python -m unittest discover `
+  -s packages/document-processing/text_layer `
   -p "test_*.py"
 ```
 
@@ -185,6 +313,14 @@ python -m unittest discover `
   documents whose front matter is unusually long.
 - Reading order and extracted characters depend on the PDF text layer exposed
   by PyMuPDF.
+- Quality scores are deterministic heuristics, not OCR-need ground truth or a
+  statistically calibrated probability. Benchmark results should be reported
+  as a validation distribution rather than accuracy until labeled quality
+  ground truth exists.
+- The Thai corruption heuristic detects recurring malformed character
+  sequences but cannot identify every broken custom font encoding.
+- `approximate_word_count` uses whitespace tokens and is not Thai linguistic
+  tokenization.
 - Structural recovery assumes the common academic front-matter pattern where
   a Thai abstract precedes a detected English abstract. Other templates may
   require configuration changes or manual review.
