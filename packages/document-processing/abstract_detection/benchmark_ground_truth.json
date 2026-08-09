@@ -1,0 +1,26 @@
+{
+  "dataset": "OCR benchmark PDFs",
+  "verification": "Manually verified from the rendered Thai abstract pages and PDF front-matter Title/Abstract structure, independently of detector output.",
+  "documents": [
+    {"document_id": "document_007", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_009", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_022", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_064", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_071", "thai_abstract_page": 4, "english_abstract_page": 6},
+    {"document_id": "document_114", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_123", "thai_abstract_page": 4, "english_abstract_page": 6},
+    {"document_id": "document_127", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_137", "thai_abstract_page": 4, "english_abstract_page": 6},
+    {"document_id": "document_191", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_213", "thai_abstract_page": 4, "english_abstract_page": 6},
+    {"document_id": "document_222", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_251", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_253", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_254", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_266", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_283", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_295", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_335", "thai_abstract_page": 4, "english_abstract_page": 5},
+    {"document_id": "document_339", "thai_abstract_page": 4, "english_abstract_page": 5}
+  ]
+}
