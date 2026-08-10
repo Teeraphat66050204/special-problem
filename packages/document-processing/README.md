@@ -7,11 +7,14 @@ PDF
   -> Abstract Page Detection
   -> Text Layer Extraction
   -> Text Layer Quality Assessment
-  -> OCR Fallback (not implemented yet)
+  -> Conditional OCR Fallback
+  -> Unified Extracted Text
+  -> Text Normalization (next)
+  -> Metadata Extraction (next)
 ```
 
-It does not depend on the API application, OCR runners, a database, or a
-metadata extraction pipeline.
+It does not depend on the API application, benchmark OCR runners, a database,
+or a metadata extraction pipeline.
 
 ## Installation
 
@@ -202,6 +205,66 @@ An abridged analyzed page looks like this:
 }
 ```
 
+## Conditional OCR Fallback
+
+`ocr.process_abstract_pages()` consumes every page in `abstract_pages`, not
+only `primary_candidate`. Pages classified as `good` use their untouched
+`raw_text` and never invoke the renderer or OCR provider. Pages classified as
+`poor` or `missing` are rendered individually with PyMuPDF as an in-memory
+300 DPI RGB PNG with no preprocessing, then passed to an injected
+`OCRProvider`:
+
+```python
+import sys
+
+sys.path.insert(0, "packages/document-processing")
+
+from ocr import TyphoonProvider, process_abstract_pages
+
+result = process_abstract_pages(
+    "document.pdf",
+    ocr_provider=TyphoonProvider(),
+)
+```
+
+The orchestration layer depends only on `provider.extract(page_image)`. The
+provider returns an `OCRResult` containing provider-neutral fields such as
+`success`, `text`, `raw_text`, `raw_format`, `processing_time_ms`, and a
+structured error. Tests can inject a fake provider without network access,
+and another OCR provider can be added without modifying fallback logic.
+
+Every processed abstract page exposes one downstream `text` field:
+
+- `text_source: "text_layer"` means `text` is original PyMuPDF text and OCR
+  was not called.
+- `text_source: "ocr"` means `text` is deterministic plain text converted
+  from the provider response. Typhoon's original Markdown remains in
+  `ocr.raw_text` with `ocr.raw_format: "markdown"`.
+- `text_source: null` means OCR failed. The result sets
+  `processing_status: "ocr_failed"`, `requires_manual_review: true`, and a
+  structured `error`.
+
+The pipeline never silently falls back to a text layer already classified as
+`poor` or `missing` after OCR failure.
+
+### Typhoon Provider
+
+The production Typhoon provider uses the official model and request
+configuration validated by the benchmark runner while remaining independent
+of `experiments/`. It reads the API key only from the server-side environment:
+
+```powershell
+$env:TYPHOON_OCR_API_KEY="<key>"
+```
+
+The key is never printed or included in result metadata. A missing key or
+dependency is returned as a controlled provider error. Transient timeouts,
+connection failures, HTTP 429, and HTTP 5xx responses use configurable bounded
+exponential retries. Authentication failures, malformed requests, and other
+permanent client errors are not retried. Request interval and concurrency are
+configurable locally; a future backend job queue remains responsible for
+multi-user scheduling.
+
 ## CLI
 
 Abstract Page Detection:
@@ -228,6 +291,17 @@ python packages/document-processing/text_layer/analyze_text_layer.py `
 Add `--json` to emit the complete structured result, including raw text,
 quality features, reasons, and the page numbers currently marked
 `requires_ocr`.
+
+Conditional OCR Fallback:
+
+```powershell
+python packages/document-processing/ocr/process_document.py `
+  --input datasets/ocr-benchmark/pdfs/document_007.pdf
+```
+
+Use `--json` for the complete provider-neutral result. Retry, timeout, request
+interval, and concurrency settings are exposed as CLI options. The command
+returns a nonzero exit code when any OCR-routed page fails.
 
 ## Benchmark Evaluation
 
@@ -300,23 +374,28 @@ python -m unittest discover `
 python -m unittest discover `
   -s packages/document-processing/text_layer `
   -p "test_*.py"
+
+python -m unittest discover `
+  -s packages/document-processing/ocr `
+  -p "test_*.py"
 ```
 
 ## Limitations
 
-- This branch reads the PDF text layer and basic vector layout structure only.
-  It contains no OCR fallback. Scanned pages without useful structural
-  evidence can still require manual selection.
+- OCR is conditional on the current quality classifier. A quality false
+  negative continues to use the text layer; fallback contains no
+  document-specific overrides.
+- OCR only applies after Abstract Page Detection. Scanned pages without useful
+  detection evidence can still require manual page selection.
 - The method is a structural heuristic, not a semantic classifier. Documents
   with unusual headings or very short abstracts may need tuned weights.
 - Only the first `max_pages` pages are considered. Increase the value for
   documents whose front matter is unusually long.
 - Reading order and extracted characters depend on the PDF text layer exposed
   by PyMuPDF.
-- Quality scores are deterministic heuristics, not OCR-need ground truth or a
-  statistically calibrated probability. Benchmark results should be reported
-  as a validation distribution rather than accuracy until labeled quality
-  ground truth exists.
+- Quality scores are deterministic heuristics, not statistically calibrated
+  probabilities. The labeled quality benchmark documents known mismatches,
+  including false negatives that OCR fallback intentionally does not override.
 - The Thai corruption heuristic detects recurring malformed character
   sequences but cannot identify every broken custom font encoding.
 - `approximate_word_count` uses whitespace tokens and is not Thai linguistic
@@ -324,3 +403,6 @@ python -m unittest discover `
 - Structural recovery assumes the common academic front-matter pattern where
   a Thai abstract precedes a detected English abstract. Other templates may
   require configuration changes or manual review.
+- Typhoon is an external paid service. Unit tests and routing validation inject
+  fake providers; operators should restrict real smoke tests to the minimum
+  pages needed and keep API keys outside source code and client output.
