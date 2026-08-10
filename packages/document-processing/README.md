@@ -9,7 +9,8 @@ PDF
   -> Text Layer Quality Assessment
   -> Conditional OCR Fallback
   -> Unified Extracted Text
-  -> Text Normalization (next)
+  -> Text Normalization
+  -> Canonical Text
   -> Metadata Extraction (next)
 ```
 
@@ -247,6 +248,57 @@ Every processed abstract page exposes one downstream `text` field:
 The pipeline never silently falls back to a text layer already classified as
 `poor` or `missing` after OCR failure.
 
+## Text Normalization
+
+`normalization.normalize_text()` converts unified extracted text into a
+canonical representation for future Metadata Extraction. Normalization is
+formatting, not error correction: it never guesses Thai words, repairs OCR
+spelling, applies document-specific substitutions, or removes content
+punctuation.
+
+```python
+import sys
+
+sys.path.insert(0, "packages/document-processing")
+
+from normalization import normalize_processed_document, normalize_text
+
+text_result = normalize_text("  Cafe\u0301\t title  \r\n")
+print(text_result.normalized_text)
+
+# `processing_result` is the complete Conditional OCR Fallback result.
+normalized_document = normalize_processed_document(processing_result)
+```
+
+The default immutable `NormalizationConfig` applies these conservative rules:
+
+- Unicode NFC normalization (never NFKC/NFKD by default);
+- CRLF, CR, and Unicode line separators to LF;
+- removal of BOM and selected stray zero-width characters, while retaining
+  ZWNJ and ZWJ by default;
+- NBSP and other horizontal Unicode space variants to regular spaces;
+- tabs to spaces and repeated horizontal spaces to one space;
+- per-line whitespace trimming, document-edge trimming, and no more than two
+  consecutive blank lines.
+
+Line order and paragraph breaks remain intact. The original unified page
+`text` is never overwritten: a normalized page adds `normalized_text`,
+`normalization_status`, and structured `normalization` metadata containing
+operations, warnings, and length/line statistics. Thai and English abstract
+pages are normalized separately and remain separate items in `abstract_pages`.
+
+If OCR failed, processing was unsuccessful, or `text` is `null`, normalization
+is skipped; `normalized_text` remains `null` and the page requires manual
+review. Whitespace-only successful text is marked `empty` and also requires
+review. Suspicious character-separated Thai can emit
+`suspicious_thai_character_spacing`, but the text is deliberately not joined
+or corrected.
+
+Normalization is idempotent: applying it again to canonical text returns the
+same text. Callers may replace the default config explicitly, including the
+Unicode form, blank-line limit, tab handling, whitespace collapsing, and the
+selected removable zero-width characters.
+
 ### Typhoon Provider
 
 The production Typhoon provider uses the official model and request
@@ -302,6 +354,33 @@ python packages/document-processing/ocr/process_document.py `
 Use `--json` for the complete provider-neutral result. Retry, timeout, request
 interval, and concurrency settings are exposed as CLI options. The command
 returns a nonzero exit code when any OCR-routed page fails.
+
+Text Normalization from a UTF-8 file:
+
+```powershell
+python packages/document-processing/normalization/normalize_text.py `
+  --input-text-file sample.txt
+```
+
+Omit `--input-text-file` to read stdin. Add `--json` to emit the original and
+normalized text, preserved lines, operations, warnings, and statistics. This
+standalone command never invokes an OCR provider.
+
+Run offline normalization validation over the benchmark PDFs using production
+Text Layer/Quality routing and the stored Thai reference text for OCR-routed
+pages:
+
+```powershell
+python packages/document-processing/normalization/validate_normalization.py `
+  --pdf-dir datasets/ocr-benchmark/pdfs `
+  --manifest datasets/ocr-benchmark/manifests/manifest.csv `
+  --precomputed-text-dir datasets/ocr-benchmark/ground-truth
+```
+
+The report separates text-layer and precomputed OCR inputs and includes
+changed/unchanged/skipped counts, warnings, lengths, content-preservation
+checks, and idempotence failures. It is normalization validation, not an OCR or
+metadata accuracy measurement, and it never invokes an OCR API.
 
 ## Benchmark Evaluation
 
@@ -366,17 +445,38 @@ does not assign usability labels.
 
 ## Tests
 
+From the repository root, run every Document Processing test with one command:
+
+```powershell
+python -m unittest discover `
+  -s packages/document-processing `
+  -p "test_*.py"
+```
+
+`document-processing` contains a hyphen and is therefore used as the unittest
+discovery/import root rather than imported as a package name. Its four child
+directories are regular Python packages. To run one suite while retaining the
+same package import context, pass the explicit top-level directory:
+
 ```powershell
 python -m unittest discover `
   -s packages/document-processing/abstract_detection `
+  -t packages/document-processing `
   -p "test_*.py"
 
 python -m unittest discover `
   -s packages/document-processing/text_layer `
+  -t packages/document-processing `
   -p "test_*.py"
 
 python -m unittest discover `
   -s packages/document-processing/ocr `
+  -t packages/document-processing `
+  -p "test_*.py"
+
+python -m unittest discover `
+  -s packages/document-processing/normalization `
+  -t packages/document-processing `
   -p "test_*.py"
 ```
 
@@ -406,3 +506,7 @@ python -m unittest discover `
 - Typhoon is an external paid service. Unit tests and routing validation inject
   fake providers; operators should restrict real smoke tests to the minimum
   pages needed and keep API keys outside source code and client output.
+- Text normalization cannot repair corrupt font mappings, character-separated
+  Thai, OCR spelling, reading order, or missing text. Those cases must be
+  handled by Quality Assessment, OCR, or manual review rather than guessed by
+  normalization.
