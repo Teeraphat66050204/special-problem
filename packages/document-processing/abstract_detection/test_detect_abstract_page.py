@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from detect_abstract_page import (
+from abstract_detection.detect_abstract_page import (
     AbstractDetectionError,
     DEFAULT_SCORING_CONFIG,
     _add_pdf_structure_features,

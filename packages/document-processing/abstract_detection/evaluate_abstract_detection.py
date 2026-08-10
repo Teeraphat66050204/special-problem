@@ -9,11 +9,18 @@ import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from detect_abstract_page import (
-    DEFAULT_MAX_PAGES,
-    AbstractDetectionError,
-    detect_abstract_page,
-)
+if __package__ in {None, ""}:
+    from detect_abstract_page import (  # type: ignore[import-not-found]
+        DEFAULT_MAX_PAGES,
+        AbstractDetectionError,
+        detect_abstract_page,
+    )
+else:
+    from .detect_abstract_page import (
+        DEFAULT_MAX_PAGES,
+        AbstractDetectionError,
+        detect_abstract_page,
+    )
 
 
 DEFAULT_GROUND_TRUTH = Path(__file__).with_name("benchmark_ground_truth.json")

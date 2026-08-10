@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from evaluate_abstract_detection import evaluate_predictions
+from abstract_detection.evaluate_abstract_detection import evaluate_predictions
 
 
 def candidate(page_number: int, language: str) -> dict[str, object]:
