@@ -11,11 +11,12 @@ PDF
   -> Unified Extracted Text
   -> Text Normalization
   -> Metadata Extraction
-  -> Metadata Validation (next)
+  -> Metadata Validation
+  -> Review / Correction (next)
 ```
 
 It does not depend on the API application, benchmark OCR runners, a database,
-or a metadata validation pipeline.
+or a correction workflow.
 
 ## Installation
 
@@ -353,6 +354,95 @@ warnings. Missing co-advisors are a normal empty list. Upstream normalization
 warnings such as `suspicious_thai_character_spacing` are propagated and lower
 candidate confidence without changing text.
 
+## Metadata Validation
+
+`metadata_validation.validate_metadata()` consumes a Metadata Extraction
+result directly. It never opens a PDF, reruns extraction, invokes OCR, calls a
+network service, reads a database, or mutates the extraction result.
+
+```python
+from metadata_validation import validate_metadata
+
+validation = validate_metadata(extraction)
+output = validation.to_dict()
+```
+
+Validation and correction are deliberately separate. Validation checks the
+selected metadata and its extraction confidence, candidates, alternatives,
+evidence, and warnings. It reports problems and safe equivalences but never
+rewrites an extracted value, translates a name, fixes spelling, merges
+keywords, or chooses a different semantic candidate.
+
+Each field has one structured status:
+
+- `VALID`: local format and consistency checks pass and no unresolved risk is
+  present;
+- `REVIEW_REQUIRED`: a value exists but confidence, ambiguity, source quality,
+  missing reference coverage, or a semantic conflict needs human review;
+- `INVALID`: an existing value demonstrably violates a format or supplied
+  authoritative relation; and
+- `MISSING`: no extracted value is available.
+
+The document status is `VALID`, `REVIEW_REQUIRED`, `INVALID`, or `FAILED`.
+One missing field does not cause `FAILED`; that status is reserved for an
+invalid/failed extraction input or a result with no meaningful metadata. A
+critical invalid field makes the document invalid. Missing required fields,
+important invalid fields, unresolved conflicts, and risky upstream warnings
+request review.
+
+The configurable required policy accepts either `title_th` or `title_en`, and
+either `abstract_th` or `abstract_en`. Students and their IDs, degree,
+department, faculty, academic year, and primary advisor are required. Empty
+co-advisors are valid. Empty keywords are valid by default, with a config flag
+available to request review instead. Field criticality, confidence and length
+thresholds, ID pattern, year ranges, reference policy, and keyword limits are
+centralized in immutable `ValidationConfig`.
+
+Student IDs use a configurable full-match pattern and are strong identity
+keys. Different Thai and English name strings with the same ID can be reported
+as `semantic_match_by_student_id` without transliteration. Repeated identical
+records, missing names/IDs, malformed IDs, and a single normalized name tied to
+different IDs remain visible through reason codes.
+
+Academic years are compared without changing the selected value. Four-digit
+BE and CE candidates receive a comparable form containing their original
+value, calendar, and CE equivalent. For example, `2569` and `2026` resolve
+safely through the generic 543-year offset; `2569` and `2025` remain a real
+conflict. Configured BE/CE ranges prevent arbitrary numeric values from being
+accepted as years.
+
+Conservative candidate comparison uses Unicode NFC, trimming, whitespace
+collapse, safe punctuation spacing, and case-folding. It can resolve
+whitespace/case-only differences and BE/CE equivalence. It does not use fuzzy
+matching, Thai-diacritic removal, synonym guessing, translation, or
+transliteration. Different advisor, department, title, or student-ID
+candidates therefore remain reviewable unless injected reference data proves
+the relation.
+
+`ValidationReferenceData` accepts a Python object/dict or JSON fixture with
+departments and expected faculties, faculties, degrees, advisors, and
+programs. Lookups are normalized exact comparisons. Reference data is injected
+by the caller; the validator has no PostgreSQL or network adapter. Checks that
+cannot run without references are reported separately as
+`skipped_unavailable`, never counted as a reference pass. Reference lookup is
+non-blocking by default and can be required per field through config.
+
+Title checks cover missing/heading-only values, suspicious lengths, label
+contamination, confidence, warnings, and candidate conflicts. Abstract checks
+cover missing/heading-only/short text, front-matter or keyword contamination,
+and suspicious source warnings. Keyword validation checks only the extracted
+list for empty/duplicate/footer-like/excessive items; it never splits or merges
+items. Advisor checks preserve prefixes and detect missing/label-contaminated
+names, duplicate co-advisors, and a primary advisor repeated as co-advisor.
+
+Every validation reason has a machine-readable code, severity, message, and
+optional details/evidence. Examples include `missing_required_field`,
+`invalid_student_id_format`, `semantic_match_by_student_id`,
+`academic_year_semantic_equivalent`, `academic_year_conflict`,
+`low_extraction_confidence`, `candidate_conflict`,
+`reference_data_unavailable`, and `department_faculty_mismatch`. Extraction
+and upstream warnings are retained rather than replaced by validation status.
+
 ### Typhoon Provider
 
 The production Typhoon provider uses the official model and request
@@ -448,6 +538,19 @@ field-level confidence/evidence/candidates, warnings, status, and extraction
 statistics. This command only parses supplied normalized text and cannot invoke
 OCR.
 
+Metadata Validation from a stored Metadata Extraction result:
+
+```powershell
+python packages/document-processing/metadata_validation/validate_metadata.py `
+  --input-json extracted_metadata.json
+```
+
+Omit `--input-json` to read JSON from stdin. Add
+`--reference-data reference_data.json` to inject optional local master data.
+The structured JSON output preserves the extracted metadata and adds document
+and field statuses, reason codes, warnings, manual-review decision, conflict
+statistics, validation coverage, and reference-check coverage.
+
 ## Benchmark Evaluation
 
 `abstract_detection/benchmark_ground_truth.json` contains manually verified
@@ -508,6 +611,37 @@ The report includes every mismatch, categorized causes, review counts, and
 local extraction time per document. Accuracy is intentionally reported before
 any generic heuristic changes and must not be converted into document-specific
 rules.
+
+## Metadata Validation Evaluation
+
+`metadata_validation/benchmark_validation_ground_truth.json` is a manually
+reviewed representative subset of seven documents. It compares stored
+extraction results with the independent metadata ground truth and covers a
+clean document, source corruption, missing English source text, BE/CE semantic
+equivalence, student ambiguity, advisor/co-advisor conflict, title boundaries,
+academic-field mismatches, and keyword splitting. Validator predictions were
+not copied into these labels. The subset contains no defensible `INVALID`
+document example, so invalid-class recall/F1 remains not evaluable rather than
+being inferred.
+
+Run the complete 20-document pipeline evaluation using only local PDF text and
+stored OCR reference text:
+
+```powershell
+python packages/document-processing/metadata_validation/evaluate_metadata_validation.py `
+  --pdf-dir datasets/ocr-benchmark/pdfs `
+  --manifest datasets/ocr-benchmark/manifests/manifest.csv `
+  --precomputed-text-dir datasets/ocr-benchmark/ground-truth
+```
+
+The evaluator never calls an OCR API. It reports complete 20-document status
+distributions, validation/manual-review counts before and after validation,
+field validation coverage, conflicts received/resolved/unresolved, semantic
+equivalence by field, reference checks performed/skipped, and local validation
+time. Against the representative ground truth it additionally reports field
+and document status accuracy, per-class precision/recall/F1, manual-review
+precision/recall/F1, false positives, false negatives, and incorrectly resolved
+conflicts. Manual-review false negatives are treated as the higher-risk error.
 
 ## Text Layer Quality Evaluation
 
@@ -582,6 +716,11 @@ python -m unittest discover `
   -s packages/document-processing/metadata_extraction `
   -t packages/document-processing `
   -p "test_*.py"
+
+python -m unittest discover `
+  -s packages/document-processing/metadata_validation `
+  -t packages/document-processing `
+  -p "test_*.py"
 ```
 
 ## Limitations
@@ -618,5 +757,16 @@ python -m unittest discover `
   Layouts flattened into one line, unknown label variants, bilingual
   translations, ambiguous whitespace-only keyword lists, and corrupt source
   text can produce alternatives, low confidence, partial output, or manual
-  review. Metadata Validation, master-data checks, and correction remain out of
-  scope.
+  review.
+- Metadata validation cannot prove Thai/English translations or transliterated
+  person names equivalent without authoritative injected aliases. It therefore
+  remains conservative for bilingual degree, department, faculty, and advisor
+  alternatives. Reference data can provide exact relations, but the package
+  contains no institutional master data and never invents it from the
+  benchmark.
+- Validation detects extraction errors only when format, candidates, warnings,
+  or supplied reference relations expose them. Structurally plausible title
+  boundaries, keyword splits, and corrupted-source values can remain false
+  negatives. Validation does not re-parse raw text to repair these errors.
+- Review / Correction, automatic correction, database integration, fuzzy name
+  matching, and API application wiring remain out of scope.
