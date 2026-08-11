@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "verification": {
+    "method": "Representative validation labels assigned by comparing stored Metadata Extraction outputs with the independently transcribed metadata ground truth and reviewed source limitations. Validator output was not used to assign expected labels.",
+    "coverage": "Seven documents cover a clean extraction, semantic BE/CE year equivalence, missing English source text, student-pairing ambiguity, advisor/co-advisor conflict, title boundary errors, academic-field errors, and keyword splitting errors.",
+    "status_policy": "A structurally plausible extraction mismatch is REVIEW_REQUIRED unless the supplied value is demonstrably malformed. Missing unavailable language-specific source text is MISSING at field level and REVIEW_REQUIRED at document level. No reliable INVALID document example exists in this subset."
+  },
+  "documents": {
+    "document_009": {
+      "expected_document_status": "VALID",
+      "expected_manual_review": false,
+      "known_issue": "No metadata ground-truth mismatch; bilingual academic/advisor strings are correct translations but cannot be proven equivalent without authoritative reference aliases.",
+      "fields": {
+        "students": "VALID",
+        "student_id": "VALID",
+        "academic_year": "VALID",
+        "advisor": "VALID"
+      }
+    },
+    "document_022": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "Known corrupted Thai source causes several plausible-looking but incorrect extracted fields.",
+      "fields": {
+        "title_th": "REVIEW_REQUIRED",
+        "students": "REVIEW_REQUIRED",
+        "degree": "REVIEW_REQUIRED",
+        "department": "REVIEW_REQUIRED",
+        "faculty": "REVIEW_REQUIRED",
+        "academic_year": "REVIEW_REQUIRED",
+        "advisor": "REVIEW_REQUIRED"
+      }
+    },
+    "document_064": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "English page has no stored OCR output for offline processing; Thai page remains usable.",
+      "fields": {
+        "title_en": "MISSING",
+        "abstract_en": "MISSING",
+        "title_th": "VALID"
+      }
+    },
+    "document_137": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "Thai title boundary/spacing and co-advisor selection differ from human-reviewed metadata.",
+      "fields": {
+        "title_th": "REVIEW_REQUIRED",
+        "co_advisors": "REVIEW_REQUIRED",
+        "student_id": "VALID"
+      }
+    },
+    "document_266": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "Selected CE year is semantically equivalent to the expected BE year; keyword item boundaries remain incorrect.",
+      "fields": {
+        "academic_year": "VALID",
+        "keywords": "REVIEW_REQUIRED",
+        "student_id": "VALID"
+      }
+    },
+    "document_295": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "An incomplete student candidate is retained and degree/department differ from reviewed metadata.",
+      "fields": {
+        "students": "REVIEW_REQUIRED",
+        "student_id": "REVIEW_REQUIRED",
+        "degree": "REVIEW_REQUIRED",
+        "department": "REVIEW_REQUIRED"
+      }
+    },
+    "document_007": {
+      "expected_document_status": "REVIEW_REQUIRED",
+      "expected_manual_review": true,
+      "known_issue": "Keyword splitting differs from explicitly separated human-reviewed items.",
+      "fields": {
+        "keywords": "REVIEW_REQUIRED",
+        "academic_year": "VALID",
+        "students": "VALID",
+        "student_id": "VALID"
+      }
+    }
+  }
+}
