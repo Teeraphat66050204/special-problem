@@ -10,12 +10,12 @@ PDF
   -> Conditional OCR Fallback
   -> Unified Extracted Text
   -> Text Normalization
-  -> Canonical Text
-  -> Metadata Extraction (next)
+  -> Metadata Extraction
+  -> Metadata Validation (next)
 ```
 
 It does not depend on the API application, benchmark OCR runners, a database,
-or a metadata extraction pipeline.
+or a metadata validation pipeline.
 
 ## Installation
 
@@ -299,6 +299,60 @@ same text. Callers may replace the default config explicitly, including the
 Unicode form, blank-line limit, tab handling, whitespace collapsing, and the
 selected removable zero-width characters.
 
+## Metadata Extraction
+
+`metadata_extraction.extract_metadata()` consumes the output of
+`normalize_processed_document()` directly. It reads every usable
+`abstract_pages` item independently and never opens a PDF, performs OCR, calls
+an external service, or mutates upstream raw/normalized text.
+
+```python
+import sys
+
+sys.path.insert(0, "packages/document-processing")
+
+from metadata_extraction import extract_metadata
+
+extraction = extract_metadata(normalized_document)
+metadata = extraction.metadata
+```
+
+The metadata schema contains `title_th`, `title_en`, a multi-item `students`
+list of name/ID pairs, `degree`, `department`, `faculty`, `academic_year`,
+`advisor`, `co_advisors`, `abstract_th`, `abstract_en`, and `keywords`. Missing
+scalar fields are `null`; missing list fields are empty lists.
+
+Extraction is deterministic and rule-based:
+
+- centralized Thai/English label variants accept colons, attached values, and
+  values on following lines;
+- titles use explicit title labels or conservative top-of-page inference and
+  stop before structurally clear student/front-matter sections;
+- student IDs use a configurable 7–13 digit pattern and are paired with names
+  only by same-line evidence or bounded line proximity;
+- academic and advisor values use bounded label context and preserve prefixes,
+  spelling, digits, and calendar representation from the source;
+- abstract bodies start after an explicit abstract heading and stop before the
+  keyword section or page end; and
+- keywords split only on supported comma/semicolon variants, never whitespace
+  alone, so multi-word English keywords remain intact.
+
+Every field includes its selected value, deterministic confidence, source
+page/language/line indexes, method, compact evidence, all candidates,
+alternatives, and warnings. Thai/English page candidates are resolved in a
+stable order. Conflicting values such as `2564` and `2021` are retained as
+alternatives with `conflicting_<field>_candidates`; the extractor does not
+perform translation, Buddhist/Gregorian conversion, spell correction, Thai
+word reconstruction, master-data lookup, or semantic validation.
+
+`extraction_status` is `success` when usable metadata has no review warnings,
+`partial` when metadata is available but missing/ambiguous/conflicting or
+upstream-suspicious, and `failed` when no normalized text or meaningful
+metadata is available. Missing titles, students, or advisor produce explicit
+warnings. Missing co-advisors are a normal empty list. Upstream normalization
+warnings such as `suspicious_thai_character_spacing` are propagated and lower
+candidate confidence without changing text.
+
 ### Typhoon Provider
 
 The production Typhoon provider uses the official model and request
@@ -382,6 +436,18 @@ changed/unchanged/skipped counts, warnings, lengths, content-preservation
 checks, and idempotence failures. It is normalization validation, not an OCR or
 metadata accuracy measurement, and it never invokes an OCR API.
 
+Metadata Extraction from a stored normalized pipeline result:
+
+```powershell
+python packages/document-processing/metadata_extraction/extract_metadata.py `
+  --input-json normalized_document.json
+```
+
+Omit `--input-json` to read JSON from stdin. Output always includes metadata,
+field-level confidence/evidence/candidates, warnings, status, and extraction
+statistics. This command only parses supplied normalized text and cannot invoke
+OCR.
+
 ## Benchmark Evaluation
 
 `abstract_detection/benchmark_ground_truth.json` contains manually verified
@@ -409,6 +475,39 @@ The report includes:
 - Top-3 Recall: expected Thai and English pages found among the first three
   ranked `candidates`, measured over all expected abstract pages; and
 - document-level expected/predicted pages for every miss.
+
+## Metadata Extraction Evaluation
+
+`metadata_extraction/benchmark_metadata_ground_truth.json` contains manual
+metadata transcribed independently from the existing human-reviewed Thai
+references and directly reviewed English PDF front matter for all 20 benchmark
+documents. Extractor predictions were not copied into ground truth. Fields with
+ambiguous keyword boundaries are omitted from keyword evaluation, and full
+abstract bodies are not part of this first metadata ground truth.
+
+Run the offline evaluator without calling an OCR API:
+
+```powershell
+python packages/document-processing/metadata_extraction/evaluate_metadata_extraction.py `
+  --pdf-dir datasets/ocr-benchmark/pdfs `
+  --manifest datasets/ocr-benchmark/manifests/manifest.csv `
+  --precomputed-text-dir datasets/ocr-benchmark/ground-truth
+```
+
+Scalar Field Accuracy is exact matches divided by evaluable ground-truth
+fields after evaluation-only NFC, case-folding, and whitespace collapse. It
+does not translate, correct spelling, convert years, or remove punctuation.
+Coverage is non-empty extractions divided by evaluable fields; verified empty
+optional lists count as covered values. Students require exact `(name,
+student_id)` pairs. Students, IDs, co-advisors, and keywords additionally
+report global item precision, recall, and F1. List exact match is
+order-independent. If future ground truth adds abstract bodies, the evaluator
+also reports normalized exact match and supplementary character error rate.
+
+The report includes every mismatch, categorized causes, review counts, and
+local extraction time per document. Accuracy is intentionally reported before
+any generic heuristic changes and must not be converted into document-specific
+rules.
 
 ## Text Layer Quality Evaluation
 
@@ -454,7 +553,7 @@ python -m unittest discover `
 ```
 
 `document-processing` contains a hyphen and is therefore used as the unittest
-discovery/import root rather than imported as a package name. Its four child
+discovery/import root rather than imported as a package name. Its five child
 directories are regular Python packages. To run one suite while retaining the
 same package import context, pass the explicit top-level directory:
 
@@ -476,6 +575,11 @@ python -m unittest discover `
 
 python -m unittest discover `
   -s packages/document-processing/normalization `
+  -t packages/document-processing `
+  -p "test_*.py"
+
+python -m unittest discover `
+  -s packages/document-processing/metadata_extraction `
   -t packages/document-processing `
   -p "test_*.py"
 ```
@@ -510,3 +614,9 @@ python -m unittest discover `
   Thai, OCR spelling, reading order, or missing text. Those cases must be
   handled by Quality Assessment, OCR, or manual review rather than guessed by
   normalization.
+- Metadata extraction is label- and structure-based, not semantic validation.
+  Layouts flattened into one line, unknown label variants, bilingual
+  translations, ambiguous whitespace-only keyword lists, and corrupt source
+  text can produce alternatives, low confidence, partial output, or manual
+  review. Metadata Validation, master-data checks, and correction remain out of
+  scope.
