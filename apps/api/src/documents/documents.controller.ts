@@ -1,28 +1,38 @@
-import { Controller, Post, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseInterceptors, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator, NotFoundException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { StorageService } from '../storage/storage.service';
+import { DocumentsService } from './documents.service';
 
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly storageService: StorageService) {}
+  constructor(private readonly documentsService: DocumentsService) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file')) // รับไฟล์จาก Key ชื่อ 'file'
-  async uploadDocument(@UploadedFile() file: Express.Multer.File) {
-    if (!file) {
-      throw new BadRequestException('กรุณาแนบไฟล์ PDF');
-    }
-    
-    if (file.mimetype !== 'application/pdf') {
-      throw new BadRequestException('ระบบรองรับเฉพาะไฟล์เอกสารรูปแบบ PDF เท่านั้น');
-    }
-
-    const savedFileName = await this.storageService.uploadFile(file);
-    
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 10 * 1024 * 1024 }), // จำกัดขนาดไฟล์ที่ 10MB
+          new FileTypeValidator({ fileType: 'application/pdf' }), // บังคับรับเฉพาะ PDF
+        ],
+      }),
+    ) file: Express.Multer.File,
+  ) {
+    const document = await this.documentsService.processUpload(file);
     return {
-      message: 'อัปโหลดไฟล์สำเร็จ',
-      fileName: savedFileName,
-      status: 'uploaded',
+      message: 'อัปโหลดไฟล์และนำเข้าคิวสำเร็จ',
+      data: document,
+    };
+  }
+
+  // API สำหรับเช็กสถานะว่าตอนนี้งานถึงไหนแล้ว
+  @Get(':id/status')
+  async getStatus(@Param('id') id: string) {
+    const document = await this.documentsService.getDocumentStatus(id);
+    if (!document) throw new NotFoundException('ไม่พบเอกสารในระบบ');
+    return {
+      id: document.id,
+      status: document.status,
     };
   }
 }

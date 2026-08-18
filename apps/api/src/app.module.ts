@@ -2,49 +2,42 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-import { StorageModule } from './storage/storage.module';
 import { DocumentsModule } from './documents/documents.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
-    // 1. โหลดไฟล์ .env มาใช้งาน
     ConfigModule.forRoot({ isGlobal: true }),
-
-    // 2. เชื่อมต่อ PostgreSQL
+    
+    // ตั้งค่าเชื่อมต่อ PostgreSQL
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: config.get<string>('DB_HOST'),
-        port: config.get<number>('DB_PORT'),
-        username: config.get<string>('DB_USER'),
-        password: config.get<string>('DB_PASSWORD'),
-        database: config.get<string>('DB_NAME'),
+        host: configService.get<string>('DB_HOST') || 'localhost',
+        port: configService.get<number>('DB_PORT') || 5432,
+        username: configService.get<string>('DB_USER') || 'postgres',
+        password: configService.get<string>('DB_PASSWORD') || 'postgres',
+        database: configService.get<string>('DB_NAME') || 'special_problem',
         autoLoadEntities: true,
-        synchronize: true, // สร้าง Table อัตโนมัติ (เหมาะสำหรับตอนกำลังพัฒนา)
+        synchronize: true, 
       }),
     }),
 
-    // 3. เชื่อมต่อ Redis Queue
+    // ตั้งค่าเชื่อมต่อ Redis สำหรับทำ Job Queue
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         redis: {
-          host: config.get<string>('REDIS_HOST'),
-          port: config.get<number>('REDIS_PORT'),
+          host: configService.get<string>('REDIS_HOST') || 'localhost',
+          port: configService.get<number>('REDIS_PORT') || 6379,
         },
       }),
     }),
-
-    StorageModule,
-
     DocumentsModule,
+    StorageModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
